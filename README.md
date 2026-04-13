@@ -31,7 +31,7 @@ git clone --recurse-submodules https://github.com/togethercomputer/System-Aware-
 cd System-Aware-4-Bit-KV-Cache-Quantization
 ```
 
-If nested `tore-eval` fails under `sglang-fast-rotation` (private submodule), you can still reproduce accuracy with **simple-evals**; see [SUBMODULE_VERSIONS.md](SUBMODULE_VERSIONS.md).
+**Accuracy** in this repository is reproduced only with the open-source **[simple-evals](https://github.com/openai/simple-evals)** client against SGLang’s OpenAI-compatible API (not tore-eval). If `git submodule update --init --recursive` fails on an optional nested dependency inside a fork, initialize the two top-level submodules only; see [SUBMODULE_VERSIONS.md](SUBMODULE_VERSIONS.md) and [scripts/clone_submodules.sh](scripts/clone_submodules.sh).
 
 Full install (CUDA, PyTorch, `fast_hadamard_transform`, `flash-kmeans`, simple-evals): [docs/01-preparation.md](docs/01-preparation.md). Overview of docs: [docs/00-overview.md](docs/00-overview.md).
 

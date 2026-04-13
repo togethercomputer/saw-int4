@@ -46,6 +46,8 @@ python -m sglang.launch_server --model-path "Qwen/Qwen3-8B" --port 30000 --kv-ca
 
 BDR requires `fast_hadamard_transform` (see [01-preparation.md](01-preparation.md)).
 
-## Larger evaluation batches
+## Accuracy evaluation (paper workflow)
 
-The submodule ships `eval_kv_rotation.sh`, which sweeps BF16 / INT4 / Hadamard settings and can drive an internal **tore-eval** preset pipeline. Initializing `tore-eval` may require access to a private submodule; override `CONDA_BASE` / `CONDA_ENV_NAME` in that script for your machine, or use **simple-evals** from this repo’s [03-evaluation-matrix.md](03-evaluation-matrix.md) instead.
+For **all accuracy numbers**, use the open-source **[simple-evals](https://github.com/openai/simple-evals)** client against a server built from **sglang-kmeans**, following [03-evaluation-matrix.md](03-evaluation-matrix.md). This repository does **not** use tore-eval for benchmarking.
+
+The `sglang-fast-rotation` submodule may still contain legacy scripts (for example `eval_kv_rotation.sh`) used internally by the fork; they are **not** part of the official reproduction path documented here.

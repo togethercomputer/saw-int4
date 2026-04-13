@@ -13,6 +13,6 @@ This repository is the official companion for **System-Aware 4-Bit KV Cache Quan
 
 1. [01-preparation.md](01-preparation.md) — environment and builds  
 2. [02-bdr-inference.md](02-bdr-inference.md) — running BDR (K-only by default) on `sglang-fast-rotation`  
-3. [03-evaluation-matrix.md](03-evaluation-matrix.md) — accuracy matrix on `sglang-kmeans` + [OpenAI simple-evals](https://github.com/openai/simple-evals)  
+3. [03-evaluation-matrix.md](03-evaluation-matrix.md) — accuracy matrix on `sglang-kmeans` + open-source [simple-evals](https://github.com/openai/simple-evals) only (no tore-eval)  
 4. [04-kv-calibration.md](04-kv-calibration.md) — dump KV → fit centroids → `SGLANG_KV_CENTROIDS_PATH`  
 5. [05-throughput-benchmarking.md](05-throughput-benchmarking.md) — SGLang `bench_serving` on `sglang-fast-rotation`

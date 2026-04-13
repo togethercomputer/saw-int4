@@ -18,7 +18,13 @@ If you already cloned without submodules:
 git submodule update --init --recursive
 ```
 
-If nested `tore-eval` fails (private remote), you can still use **simple-evals** and the scripts in [../scripts](../scripts); see [SUBMODULE_VERSIONS.md](../SUBMODULE_VERSIONS.md).
+If recursive init fails (some forks carry optional nested submodules you do not need for this paper), run [../scripts/clone_submodules.sh](../scripts/clone_submodules.sh) or:
+
+```bash
+git submodule update --init third_party/sglang-fast-rotation third_party/sglang-kmeans
+```
+
+See [SUBMODULE_VERSIONS.md](../SUBMODULE_VERSIONS.md).
 
 ## Build SGLang (each fork)
 
@@ -46,7 +52,9 @@ pip install "flash-kmeans @ git+https://github.com/jindajia/flash-kmeans.git"
 
 ## OpenAI simple-evals (accuracy)
 
-Accuracy numbers in the paper use **[openai/simple-evals](https://github.com/openai/simple-evals)** in the **zero-shot chain-of-thought** style against an OpenAI-compatible server.
+**This repository standardizes on the open-source [simple-evals](https://github.com/openai/simple-evals)** for all accuracy benchmarking. We do **not** use tore-eval in this paper workflow.
+
+Install from GitHub:
 
 ```bash
 git clone https://github.com/openai/simple-evals.git
@@ -55,7 +63,7 @@ pip install -e .
 pip install openai tqdm numpy
 ```
 
-You will point the OpenAI Python client at SGLang’s HTTP API (see [03-evaluation-matrix.md](03-evaluation-matrix.md)).
+Run evaluations per upstream [README](https://github.com/openai/simple-evals/blob/main/README.md) (for example `python -m simple-evals.simple_evals --model …`). Point the OpenAI client at SGLang’s HTTP API (see [03-evaluation-matrix.md](03-evaluation-matrix.md)). From the paper repo root you can set `SIMPLE_EVALS_DIR` when using [../scripts/run_eval_matrix.sh](../scripts/run_eval_matrix.sh) so the printed client commands use your checkout path.
 
 ## Hugging Face models
 

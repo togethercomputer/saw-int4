@@ -2,10 +2,12 @@
 
 **Experiment hub:** [../eval_accuracy/README.md](../eval_accuracy/README.md) (commands, results folder).
 
-All **accuracy** rows in the paper should be reproduced with the **same OpenAI simple-evals tasks** and the **same sampling hyperparameters**, varying only the **SGLang server** configuration.
+**Policy:** accuracy for this paper is measured only with the open-source **[simple-evals](https://github.com/openai/simple-evals)** repository. We do **not** use tore-eval or other private harnesses in the documented workflow.
+
+All **accuracy** rows in the paper should be reproduced with the **same simple-evals tasks** and the **same sampling hyperparameters**, varying only the **SGLang server** configuration.
 
 - **Server:** build and run [third_party/sglang-kmeans](../third_party/sglang-kmeans) (not `sglang-fast-rotation`), so k-means and dump-based methods are available.  
-- **Client:** [openai/simple-evals](https://github.com/openai/simple-evals) using the **OpenAI** sampler against SGLang’s **OpenAI-compatible** HTTP API.
+- **Client:** [openai/simple-evals](https://github.com/openai/simple-evals) — clone from GitHub, `pip install -e .`, then use the **OpenAI** sampler against SGLang’s **OpenAI-compatible** HTTP API (see upstream [running the evals](https://github.com/openai/simple-evals/blob/main/README.md#running-the-evals)).
 
 ## Start SGLang (OpenAI-compatible)
 

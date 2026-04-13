@@ -11,16 +11,27 @@ This folder is the **hub for accuracy experiments**: method matrix, calibration,
 
 Build and run **[third_party/sglang-kmeans](../third_party/sglang-kmeans)** so you can evaluate **BF16**, **INT4**, **BDR**, **k-means**, and **k-means + rotation** with the same OpenAI-compatible API.
 
-## Client
+## Client (open-source simple-evals only)
 
-Use **[OpenAI simple-evals](https://github.com/openai/simple-evals)** with:
+Accuracy is **not** run through tore-eval. Install **[simple-evals](https://github.com/openai/simple-evals)** from GitHub:
+
+```bash
+git clone https://github.com/openai/simple-evals.git
+cd simple-evals
+pip install -e .
+pip install openai tqdm numpy
+```
+
+Then point it at SGLang and run tasks from the [simple-evals README](https://github.com/openai/simple-evals/blob/main/README.md):
 
 ```bash
 export OPENAI_BASE_URL="http://127.0.0.1:30000/v1"
 export OPENAI_API_KEY="dummy"
+python -m simple-evals.simple_evals --list-models
+python -m simple-evals.simple_evals --model <model_id> --examples 200
 ```
 
-Then run the tasks you report in the paper (for example MMLU, GPQA, HumanEval), per simple-evals documentation.
+Use the benchmarks you report in the paper (MMLU, GPQA, HumanEval, etc.).
 
 From the **repository root**, print server settings for each method:
 

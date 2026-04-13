@@ -9,6 +9,6 @@ These are the commits referenced by this repository’s `git submodule` entries.
 
 Both submodules use the upstream fork: [github.com/jindajia/sglang-fork](https://github.com/jindajia/sglang-fork).
 
-## Nested submodule (`tore-eval`)
+## Nested submodules inside forks (optional)
 
-[third_party/sglang-fast-rotation/tore-eval](third_party/sglang-fast-rotation/.gitmodules) points at a private Together repository. If `git submodule update --init --recursive` fails, skip nested init and use [OpenAI simple-evals](https://github.com/openai/simple-evals) from this repo’s docs instead, or substitute your own evaluation harness against SGLang’s OpenAI-compatible HTTP API.
+Some fork branches may list extra nested submodules (for example historical eval tooling). **Paper accuracy reproduction uses only [openai/simple-evals](https://github.com/openai/simple-evals)** against SGLang’s OpenAI-compatible API, as in [docs/03-evaluation-matrix.md](docs/03-evaluation-matrix.md). You do not need any private nested submodule for that path. If `git submodule update --init --recursive` fails, run `git submodule update --init third_party/sglang-fast-rotation third_party/sglang-kmeans` or [scripts/clone_submodules.sh](scripts/clone_submodules.sh).

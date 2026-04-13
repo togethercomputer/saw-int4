@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 # Print server environment and launch hints for each accuracy method.
-# Accuracy runs use third_party/sglang-kmeans + OpenAI simple-evals against /v1.
+# Accuracy: third_party/sglang-kmeans server + open-source simple-evals client
+# https://github.com/openai/simple-evals (not tore-eval).
 #
 # Usage:
 #   ./scripts/run_eval_matrix.sh <METHOD>
 # Methods: bf16 | int4 | bdr | bdr_kv | kmeans | kmeans_bdr
 #
 # Optional env:
-#   MODEL_PATH   (default Qwen/Qwen3-8B)
-#   PORT         (default 30000)
-#   CENTROIDS    directory for SGLANG_KV_CENTROIDS_PATH (kmeans*)
-#   N_CLUSTERS   (default 16)
+#   MODEL_PATH         (default Qwen/Qwen3-8B)
+#   PORT               (default 30000)
+#   CENTROIDS          directory for SGLANG_KV_CENTROIDS_PATH (kmeans*)
+#   N_CLUSTERS         (default 16)
+#   SIMPLE_EVALS_DIR   path to your simple-evals clone (printed in client block)
 
 set -euo pipefail
 METHOD="${1:-}"
@@ -103,11 +105,21 @@ EOF
 esac
 
 echo ""
+SE="${SIMPLE_EVALS_DIR:-}"
+if [[ -n "$SE" ]]; then
+  SE_CMD="cd $(printf '%q' "$SE")"
+else
+  SE_CMD='cd /path/to/simple-evals   # git clone https://github.com/openai/simple-evals.git && pip install -e .'
+fi
 cat <<EOF
---- Client (simple-evals, separate terminal) ---
+--- Client (open-source simple-evals, separate terminal) ---
+# https://github.com/openai/simple-evals
 export OPENAI_BASE_URL="http://127.0.0.1:${PORT}/v1"
 export OPENAI_API_KEY="dummy"
-cd /path/to/simple-evals
+${SE_CMD}
 python -m simple-evals.simple_evals --list-models
 python -m simple-evals.simple_evals --model <model_id> --examples 200
 EOF
+if [[ -z "$SE" ]]; then
+  echo "# Tip: export SIMPLE_EVALS_DIR=/abs/path/to/simple-evals before $0 to emit a concrete cd." >&2
+fi
