@@ -1,15 +1,12 @@
-# Accuracy results (simple-evals)
+# Ablation accuracy results (k-means)
 
-Store per-run logs (stdout, simple-evals JSON if emitted) and a small summary file per model + method.
+Store per-run logs and summaries for **k-means + INT4** and **k-means + BDR** only (server: **sglang-kmeans**).
 
 ## Summary table (template)
 
 | Model | Method | Benchmark | Score | Notes |
 |-------|--------|-----------|-------|-------|
-| — | BF16 | MMLU | — | simple-evals task id |
-| — | INT4 | MMLU | — | |
-| — | BDR (K-only) | MMLU | — | HADAMARD_ORDER=… |
-| — | K-means + INT4 | MMLU | — | N_CLUSTERS, centroid dir |
-| — | K-means + BDR | MMLU | — | |
+| — | K-means + INT4 | MMLU | — | `N_CLUSTERS`, centroid dir |
+| — | K-means + BDR | MMLU | — | `HADAMARD_ORDER`, centroids |
 
-Add rows for each benchmark reported in the paper (GPQA, HumanEval, MATH-500, etc.).
+Add rows for each benchmark reported in the paper for ablations.

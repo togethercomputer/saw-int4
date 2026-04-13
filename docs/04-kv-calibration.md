@@ -1,5 +1,7 @@
 # KV calibration (dump → k-means centroids)
 
+**Ablation track only** (k-means server). Primary BF16 / INT4 / BDR does not require this step.
+
 The **sglang-kmeans** fork can dump floating-point KV activations once enough tokens are present in the cache, then you **fit k-means centroids offline** and reload them for **centroid-subtract INT4** inference.
 
 ## 1. Dump KV activations

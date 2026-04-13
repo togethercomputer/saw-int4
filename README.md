@@ -6,21 +6,20 @@ Official companion code for the paper **System-Aware 4-Bit KV Cache Quantization
 
 - [Introduction](#introduction)
 - [Preparation](#preparation)
-- [Run BDR](#run-bdr)
-- [Speed evaluation](#speed-evaluation)
-- [Accuracy evaluation](#accuracy-evaluation)
+- [Primary evaluation (BF16, INT4, BDR)](#primary-evaluation-bf16-int4-bdr)
+- [Ablation study (k-means, k-means + rotation)](#ablation-study-k-means-k-means--rotation)
 - [Repository layout](#repository-layout)
 - [Full reproduction](#full-reproduction)
 - [License](#license)
 
 ## Introduction
 
-This work studies **4-bit KV cache quantization** with a **system-aware** recipe. Our primary on-path method, **BDR (block-diagonal rotation)**, is implemented as **block Hadamard rotation on keys** (optional rotation on values) **before INT4 KV write**, inside a **fork of [SGLang](https://github.com/sgl-project/sglang)**—not a standalone runtime.
+This work studies **4-bit KV cache quantization** with a **system-aware** recipe. Our primary method, **BDR (block-diagonal rotation)**, is **block Hadamard rotation on keys** (optional rotation on values) **before INT4 KV write**, implemented inside a **fork of [SGLang](https://github.com/sgl-project/sglang)**.
 
 We ship two submodule branches on the same fork remote:
 
-- **[third_party/sglang-fast-rotation](third_party/sglang-fast-rotation)** — fused INT4 + BDR kernels; use for **throughput / latency** (`bench_serving`).
-- **[third_party/sglang-kmeans](third_party/sglang-kmeans)** — full **accuracy** matrix (BF16, INT4, BDR, k-means, k-means + rotation), KV dump, and centroid loading.
+- **[third_party/sglang-fast-rotation](third_party/sglang-fast-rotation)** — **Primary evaluation:** fused INT4 + BDR. Use this fork for **both accuracy and throughput** on **BF16**, **INT4**, and **BDR** (the main paper numbers).
+- **[third_party/sglang-kmeans](third_party/sglang-kmeans)** — **Ablation study:** KV dump, k-means centroids, and k-means + rotation variants. Not required to reproduce the core BDR vs BF16 vs INT4 story.
 
 Pinned commits: [SUBMODULE_VERSIONS.md](SUBMODULE_VERSIONS.md).
 
@@ -31,34 +30,41 @@ git clone --recurse-submodules https://github.com/togethercomputer/System-Aware-
 cd System-Aware-4-Bit-KV-Cache-Quantization
 ```
 
-**Accuracy** in this repository is reproduced only with the open-source **[simple-evals](https://github.com/openai/simple-evals)** client against SGLang’s OpenAI-compatible API (not tore-eval). If `git submodule update --init --recursive` fails on an optional nested dependency inside a fork, initialize the two top-level submodules only; see [SUBMODULE_VERSIONS.md](SUBMODULE_VERSIONS.md) and [scripts/clone_submodules.sh](scripts/clone_submodules.sh).
+**Accuracy** everywhere uses the open-source **[simple-evals](https://github.com/openai/simple-evals)** client against SGLang’s OpenAI-compatible API (not tore-eval). If `git submodule update --init --recursive` fails on optional nested deps inside a fork, use [scripts/clone_submodules.sh](scripts/clone_submodules.sh) or init only the two top-level submodules; see [SUBMODULE_VERSIONS.md](SUBMODULE_VERSIONS.md).
 
 ### Install SGLang
 
-Install **editable** SGLang from the pinned forks (not a standalone PyPI-only install for reproduction):
+**Primary track only:** install **fast-rotation** first:
 
 ```bash
 cd third_party/sglang-fast-rotation/python && pip install -e ".[all]"
+```
+
+**Ablations:** add the k-means fork:
+
+```bash
 cd ../../sglang-kmeans/python && pip install -e ".[all]"
 ```
 
-Full steps (CUDA / PyTorch alignment, verification): [docs/01-preparation.md](docs/01-preparation.md#install-sglang-from-submodules).
+Full steps: [docs/01-preparation.md](docs/01-preparation.md#install-sglang-from-submodules).
 
-### Prerequisites (BDR and k-means)
+### Prerequisites (MHA, Flash Attention prefill, Triton decode)
 
 | Requirement | Why |
 |-------------|-----|
-| **MHA models only** | BDR and k-means KV paths here target **multi-head attention (MHA)**. **MLA** and other non-MHA architectures are **not supported** on these code paths. |
-| **Prefill: Flash Attention backend** | Use SGLang’s Flash Attention option, e.g. **`--prefill-attention-backend fa3`** (or **`fa4`** if required by your GPU / SGLang revision). |
-| **Decode: Triton backend** | Use **`--decode-attention-backend triton`** for the decode kernels that pair with this INT4 / rotation work. |
+| **MHA models only** | These KV paths target **multi-head attention**. **MLA** and other non-MHA layouts are **not supported** here. |
+| **Prefill** | e.g. **`--prefill-attention-backend fa3`** (or **`fa4`** per GPU / SGLang). |
+| **Decode** | **`--decode-attention-backend triton`**. |
 
-Always set prefill and decode backends explicitly when reproducing experiments. Details: [docs/01-preparation.md](docs/01-preparation.md#attention-backends-and-model-support-bdr-and-k-means).
+Details: [docs/01-preparation.md](docs/01-preparation.md#attention-backends-and-model-support-bdr-and-k-means). For BDR also: `pip install fast_hadamard_transform`. For k-means ablations: `flash-kmeans` per [docs/01-preparation.md](docs/01-preparation.md).
 
-Other dependencies (`fast_hadamard_transform`, `flash-kmeans`, simple-evals): [docs/01-preparation.md](docs/01-preparation.md). Overview: [docs/00-overview.md](docs/00-overview.md).
+## Primary evaluation (BF16, INT4, BDR)
 
-## Run BDR
+Use **`third_party/sglang-fast-rotation`** for **all** primary numbers: **accuracy** (simple-evals) and **speed** (`bench_serving`). Same env knobs (`HADAMARD`, `ROTATE_V`, `HADAMARD_ORDER`, `--kv-cache-dtype`) and the same **MHA + fa3 + triton** attention stack.
 
-Default setting: **rotate K only** (`ROTATE_V=0`). From [third_party/sglang-fast-rotation/python](third_party/sglang-fast-rotation/python) after `pip install -e ".[all]"` and `pip install fast_hadamard_transform`, on an **MHA** model:
+### Running the server (example: BDR, K-only)
+
+From [third_party/sglang-fast-rotation/python](third_party/sglang-fast-rotation/python):
 
 ```bash
 export HADAMARD=1
@@ -82,14 +88,28 @@ python -m sglang.launch_server \
 
 More detail: [docs/02-bdr-inference.md](docs/02-bdr-inference.md), [third_party/sglang-fast-rotation/EVAL_NOTES.md](third_party/sglang-fast-rotation/EVAL_NOTES.md).
 
-## Speed evaluation
+### Accuracy (primary)
 
-Throughput and latency use **sglang-fast-rotation** and SGLang’s **`bench_serving`** (see [docs/05-throughput-benchmarking.md](docs/05-throughput-benchmarking.md) and upstream [Benchmark and Profiling](https://github.com/sgl-project/sglang/blob/main/docs/developer_guide/benchmark_and_profiling.md)).
+Point simple-evals at `http://127.0.0.1:<port>/v1` with the server above. Method matrix and copy-paste flow: [docs/03-evaluation-matrix.md](docs/03-evaluation-matrix.md#primary-evaluation-track).
 
-**Commands, sweep checklist, and raw log layout:** [eval_speed/](eval_speed/)  
-**Helper:** [scripts/run_bench_serving_example.sh](scripts/run_bench_serving_example.sh)
+**Hub for logs / summary tables:** [eval_primary/](eval_primary/)  
+**Helper:** [scripts/run_primary_eval_matrix.sh](scripts/run_primary_eval_matrix.sh) (`bf16`, `int4`, `bdr`, `bdr_kv`).
 
-### Speed results (summary)
+#### Accuracy results (primary)
+
+| Model | Method | Benchmark | Score |
+|-------|--------|-----------|-------|
+| — | BF16 | — | — |
+| — | INT4 | — | — |
+| — | BDR (K-only) | — | — |
+
+Fill from the paper or from [eval_primary/results/](eval_primary/results/).
+
+### Speed (primary)
+
+Throughput / latency on the **same** fast-rotation build: [docs/05-throughput-benchmarking.md](docs/05-throughput-benchmarking.md), [eval_speed/](eval_speed/), [scripts/run_bench_serving_example.sh](scripts/run_bench_serving_example.sh).
+
+#### Speed results (primary)
 
 | Model | KV config | Output tok/s | TTFT (ms) | TPOT (ms) | Workload |
 |-------|-----------|--------------|-----------|-----------|----------|
@@ -97,46 +117,46 @@ Throughput and latency use **sglang-fast-rotation** and SGLang’s **`bench_serv
 | — | INT4 | — | — | — | — |
 | — | INT4 + BDR (K-only) | — | — | — | — |
 
-Fill from paper or from logs under [eval_speed/results/](eval_speed/results/).
+Fill from [eval_speed/results/](eval_speed/results/).
 
-## Accuracy evaluation
+## Ablation study (k-means, k-means + rotation)
 
-Accuracy uses **[OpenAI simple-evals](https://github.com/openai/simple-evals)** against the OpenAI-compatible HTTP API from **sglang-kmeans**. Method matrix (env + `--kv-cache-dtype`): [docs/03-evaluation-matrix.md](docs/03-evaluation-matrix.md). KV dump → centroids: [docs/04-kv-calibration.md](docs/04-kv-calibration.md).
+Use **`third_party/sglang-kmeans`**: KV dump for calibration, [tools/fit_kv_centroids.py](tools/fit_kv_centroids.py), then `SGLANG_KV_CENTROIDS_PATH` for **k-means + INT4** and **k-means + BDR** (optional `HADAMARD` / `ROTATE_V`). Accuracy still via **simple-evals**.
 
-**Commands, method checklist, and result logs:** [eval_accuracy/](eval_accuracy/)  
-**Helper:** [scripts/run_eval_matrix.sh](scripts/run_eval_matrix.sh)
+**Docs:** [docs/03-evaluation-matrix.md](docs/03-evaluation-matrix.md#ablation-study-track), [docs/04-kv-calibration.md](docs/04-kv-calibration.md).
 
-### Accuracy results (summary)
+**Hub:** [eval_accuracy/](eval_accuracy/)  
+**Helper:** [scripts/run_eval_matrix.sh](scripts/run_eval_matrix.sh) (`kmeans`, `kmeans_bdr`; requires `CENTROIDS=`).
+
+#### Accuracy results (ablation)
 
 | Model | Method | Benchmark | Score |
 |-------|--------|-----------|-------|
-| — | BF16 | — | — |
-| — | INT4 | — | — |
-| — | BDR (K-only) | — | — |
 | — | K-means + INT4 | — | — |
 | — | K-means + BDR | — | — |
 
-Fill from paper or from logs under [eval_accuracy/results/](eval_accuracy/results/).
+Fill from [eval_accuracy/results/](eval_accuracy/results/).
 
 ## Repository layout
 
 | Path | Role |
 |------|------|
-| [docs/](docs/) | Detailed setup, BDR, accuracy matrix, calibration, throughput |
-| [third_party/sglang-fast-rotation/](third_party/sglang-fast-rotation/) | Speed / production-style BDR + INT4 |
-| [third_party/sglang-kmeans/](third_party/sglang-kmeans/) | Accuracy matrix, KV dump, k-means |
-| [scripts/](scripts/) | Submodule init, eval env printer, bench template |
-| [tools/](tools/) | `fit_kv_centroids.py` for calibration |
-| [eval_speed/](eval_speed/) | Throughput experiment hub + [eval_speed/results/](eval_speed/results/) |
-| [eval_accuracy/](eval_accuracy/) | Accuracy experiment hub + [eval_accuracy/results/](eval_accuracy/results/) |
+| [docs/](docs/) | Setup, BDR, evaluation (primary + ablation), calibration, throughput |
+| [third_party/sglang-fast-rotation/](third_party/sglang-fast-rotation/) | **Primary** BF16 / INT4 / BDR — accuracy + speed |
+| [third_party/sglang-kmeans/](third_party/sglang-kmeans/) | **Ablation** k-means KV + dump / centroids |
+| [scripts/](scripts/) | `run_primary_eval_matrix.sh`, `run_eval_matrix.sh` (ablation), `run_bench_serving_example.sh`, `clone_submodules.sh` |
+| [tools/](tools/) | `fit_kv_centroids.py` (ablation calibration) |
+| [eval_primary/](eval_primary/) | Primary **accuracy** logs / tables |
+| [eval_speed/](eval_speed/) | Primary **throughput** logs / tables |
+| [eval_accuracy/](eval_accuracy/) | Ablation **accuracy** logs / tables |
 
 ## Full reproduction
 
-Large raw bundles (logs, conda lockfiles, exact simple-evals invocations) may live outside this repo.
+Large raw bundles may live outside this repo.
 
 - **Full reproduction bundle:** *TBD — add URL*
 
-Submodule SHAs for paper alignment: [SUBMODULE_VERSIONS.md](SUBMODULE_VERSIONS.md).
+Submodule SHAs: [SUBMODULE_VERSIONS.md](SUBMODULE_VERSIONS.md).
 
 ## License
 

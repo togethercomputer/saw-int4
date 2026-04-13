@@ -1,5 +1,7 @@
 # BDR inference (SGLang fork)
 
+For **primary** BF16 / INT4 / BDR **accuracy and speed**, use **`third_party/sglang-fast-rotation`** only; see the main [README.md](../README.md#primary-evaluation-bf16-int4-bdr) and [03-evaluation-matrix.md](03-evaluation-matrix.md#primary-evaluation-track).
+
 ## What “BDR” is in code
 
 In our SGLang forks, **block-diagonal rotation before INT4 KV quantization** is implemented as a **block Hadamard** transform on the head dimension (see `HADAMARD_ORDER`), applied to **K** before writing INT4 KV, with a matching transform on **Q** at decode so attention scores are unchanged. Optionally, **V** can be rotated and the attention output counter-rotated (`ROTATE_V=1`).
@@ -55,6 +57,6 @@ BDR requires `fast_hadamard_transform` (see [01-preparation.md](01-preparation.m
 
 ## Accuracy evaluation (paper workflow)
 
-For **all accuracy numbers**, use the open-source **[simple-evals](https://github.com/openai/simple-evals)** client against a server built from **sglang-kmeans**, following [03-evaluation-matrix.md](03-evaluation-matrix.md). This repository does **not** use tore-eval for benchmarking.
+For **primary** BF16 / INT4 / BDR accuracy, use **[simple-evals](https://github.com/openai/simple-evals)** against a server built from **sglang-fast-rotation** ([03-evaluation-matrix.md](03-evaluation-matrix.md#primary-evaluation-track)). For **k-means ablations**, use **sglang-kmeans** ([ablation track](03-evaluation-matrix.md#ablation-study-track)). This repository does **not** use tore-eval for benchmarking.
 
 The `sglang-fast-rotation` submodule may still contain legacy scripts (for example `eval_kv_rotation.sh`) used internally by the fork; they are **not** part of the official reproduction path documented here.

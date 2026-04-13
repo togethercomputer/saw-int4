@@ -2,6 +2,8 @@
 
 **Experiment hub:** [../eval_speed/README.md](../eval_speed/README.md) (commands, results folder).
 
+This doc is **primary evaluation** only: BF16 / INT4 / BDR throughput on **sglang-fast-rotation** (see main [README.md](../README.md#primary-evaluation-bf16-int4-bdr)).
+
 Use **MHA** models with **Flash Attention prefill** and **Triton decode** (see [01-preparation.md](01-preparation.md#attention-backends-and-model-support-bdr-and-k-means)).
 
 Speed results should use the **fast-rotation** submodule, which contains the fused INT4 + BDR kernels intended for serving.

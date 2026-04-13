@@ -5,9 +5,9 @@
 - Linux with NVIDIA GPUs and a recent CUDA stack compatible with your PyTorch build.
 - Python 3.10+ is typical for SGLang; follow the version range stated in each submodule’s `python/pyproject.toml`.
 
-## Attention backends and model support (BDR and k-means)
+## Attention backends and model support (both forks)
 
-The BDR and k-means KV paths in our forks are implemented and tested on the following stack:
+The **primary** (`sglang-fast-rotation`) and **ablation** (`sglang-kmeans`) servers share the same attention requirements for the documented KV / BDR / k-means paths:
 
 | Requirement | Details |
 |-------------|---------|

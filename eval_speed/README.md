@@ -1,5 +1,7 @@
 # Speed evaluation (throughput / latency)
 
+Part of **primary evaluation** (BF16 / INT4 / BDR): server = **`third_party/sglang-fast-rotation`** only. For primary **accuracy** logs, see [../eval_primary/README.md](../eval_primary/README.md).
+
 This folder is the **hub for throughput experiments**: commands, conventions, and where to store raw `bench_serving` outputs.
 
 **Canonical doc:** [../docs/05-throughput-benchmarking.md](../docs/05-throughput-benchmarking.md)  

@@ -1,50 +1,29 @@
-# Accuracy evaluation (simple-evals + SGLang)
+# Ablation study — accuracy (k-means, k-means + rotation)
 
-This folder is the **hub for accuracy experiments**: method matrix, calibration, and where to store simple-evals outputs.
+This folder holds **ablation** accuracy logs for **k-means + INT4** and **k-means + BDR** on **`third_party/sglang-kmeans`**.
 
-**Canonical doc:** [../docs/03-evaluation-matrix.md](../docs/03-evaluation-matrix.md)  
+For **primary** BF16 / INT4 / BDR accuracy (fast-rotation only), use [../eval_primary/README.md](../eval_primary/README.md) and [../scripts/run_primary_eval_matrix.sh](../scripts/run_primary_eval_matrix.sh).
+
+**Canonical doc:** [../docs/03-evaluation-matrix.md](../docs/03-evaluation-matrix.md#ablation-study-track)  
 **KV dump and centroids:** [../docs/04-kv-calibration.md](../docs/04-kv-calibration.md)  
-**Helper script (server env per method):** [../scripts/run_eval_matrix.sh](../scripts/run_eval_matrix.sh)  
-**Fit centroids from dumps:** [../tools/fit_kv_centroids.py](../tools/fit_kv_centroids.py)
+**Helper script:** [../scripts/run_eval_matrix.sh](../scripts/run_eval_matrix.sh) (`kmeans`, `kmeans_bdr` only; requires `CENTROIDS=`)  
+**Fit centroids:** [../tools/fit_kv_centroids.py](../tools/fit_kv_centroids.py)
 
 ## Server
 
-Build and run **[third_party/sglang-kmeans](../third_party/sglang-kmeans)** so you can evaluate **BF16**, **INT4**, **BDR**, **k-means**, and **k-means + rotation** with the same OpenAI-compatible API.
+Build **[third_party/sglang-kmeans](../third_party/sglang-kmeans)**. Use **MHA** + **`--prefill-attention-backend fa3`** + **`--decode-attention-backend triton`** unless your stack requires a different Flash Attention option; see [../docs/01-preparation.md](../docs/01-preparation.md#attention-backends-and-model-support-bdr-and-k-means).
 
-Use **MHA** checkpoints and **`--prefill-attention-backend fa3` + `--decode-attention-backend triton`** (or the Flash Attention variant your GPU supports); see [../docs/01-preparation.md](../docs/01-preparation.md#attention-backends-and-model-support-bdr-and-k-means). [run_eval_matrix.sh](../scripts/run_eval_matrix.sh) prints these flags by default (`PREFILL_ATTENTION_BACKEND` / `DECODE_ATTENTION_BACKEND` override).
+## Client
 
-## Client (open-source simple-evals only)
+Install **[simple-evals](https://github.com/openai/simple-evals)** and point `OPENAI_BASE_URL` at the k-means server `/v1` endpoint (same as primary track).
 
-Accuracy is **not** run through tore-eval. Install **[simple-evals](https://github.com/openai/simple-evals)** from GitHub:
-
-```bash
-git clone https://github.com/openai/simple-evals.git
-cd simple-evals
-pip install -e .
-pip install openai tqdm numpy
-```
-
-Then point it at SGLang and run tasks from the [simple-evals README](https://github.com/openai/simple-evals/blob/main/README.md):
+From the **repository root**:
 
 ```bash
-export OPENAI_BASE_URL="http://127.0.0.1:30000/v1"
-export OPENAI_API_KEY="dummy"
-python -m simple-evals.simple_evals --list-models
-python -m simple-evals.simple_evals --model <model_id> --examples 200
-```
-
-Use the benchmarks you report in the paper (MMLU, GPQA, HumanEval, etc.).
-
-From the **repository root**, print server settings for each method:
-
-```bash
-./scripts/run_eval_matrix.sh bf16
-./scripts/run_eval_matrix.sh int4
-./scripts/run_eval_matrix.sh bdr
-CENTROIDS=/path/to/centroids ./scripts/run_eval_matrix.sh kmeans
-CENTROIDS=/path/to/centroids ./scripts/run_eval_matrix.sh kmeans_bdr
+CENTROIDS=/path/to/centroids_out ./scripts/run_eval_matrix.sh kmeans
+CENTROIDS=/path/to/centroids_out ./scripts/run_eval_matrix.sh kmeans_bdr
 ```
 
 ## Results
 
-Store run logs and parsed scores under **[results/](results/)**. Use the table template there; mirror headline numbers in the main [README.md](../README.md).
+Store logs under **[results/](results/)**; mirror summary rows in the main [README.md](../README.md) ablation table.
