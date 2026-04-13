@@ -1,5 +1,7 @@
 # Accuracy evaluation matrix (sglang-kmeans + simple-evals)
 
+**Experiment hub:** [../eval_accuracy/README.md](../eval_accuracy/README.md) (commands, results folder).
+
 All **accuracy** rows in the paper should be reproduced with the **same OpenAI simple-evals tasks** and the **same sampling hyperparameters**, varying only the **SGLang server** configuration.
 
 - **Server:** build and run [third_party/sglang-kmeans](../third_party/sglang-kmeans) (not `sglang-fast-rotation`), so k-means and dump-based methods are available.  

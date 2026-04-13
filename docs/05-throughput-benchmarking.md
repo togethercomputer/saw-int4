@@ -1,5 +1,7 @@
 # Throughput and latency (sglang-fast-rotation)
 
+**Experiment hub:** [../eval_speed/README.md](../eval_speed/README.md) (commands, results folder).
+
 Speed results should use the **fast-rotation** submodule, which contains the fused INT4 + BDR kernels intended for serving.
 
 Official SGLang documentation (upstream):

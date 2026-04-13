@@ -1,25 +1,43 @@
 # System-Aware 4-Bit KV Cache Quantization
 
-Official companion repository for the paper **System-Aware 4-Bit KV Cache Quantization** (Together; citation and arXiv/DOI links will be added at publication time).
+Official companion code for the paper **System-Aware 4-Bit KV Cache Quantization** (Together). *Venue / arXiv / DOI: add at publication time.*
 
-## What this repo contains
+## Contents
 
-- **Documentation** under [docs/](docs/) for environment setup, **BDR** inference, **accuracy** evaluation, **KV calibration**, and **throughput** benchmarking.  
-- **Git submodules** pointing at our SGLang forks (same remote, different branches):  
-  - [third_party/sglang-fast-rotation](third_party/sglang-fast-rotation) — fused INT4 KV + BDR; use for **speed** (`bench_serving`).  
-  - [third_party/sglang-kmeans](third_party/sglang-kmeans) — INT4 + dump + k-means centroids + BDR flags; use for the full **accuracy** matrix.  
-- **Tools:** [tools/fit_kv_centroids.py](tools/fit_kv_centroids.py) turns dumped KV tensors into centroid files expected by `SGLANG_KV_CENTROIDS_PATH`.  
-- **Scripts:** [scripts/](scripts/) helpers for submodules, eval env printing, and benchmark templates.
+- [Introduction](#introduction)
+- [Preparation](#preparation)
+- [Run BDR](#run-bdr)
+- [Speed evaluation](#speed-evaluation)
+- [Accuracy evaluation](#accuracy-evaluation)
+- [Repository layout](#repository-layout)
+- [Full reproduction](#full-reproduction)
+- [License](#license)
 
-Pinned commits are recorded in [SUBMODULE_VERSIONS.md](SUBMODULE_VERSIONS.md).
+## Introduction
 
-## BDR is SGLang-based
+This work studies **4-bit KV cache quantization** with a **system-aware** recipe. Our primary on-path method, **BDR (block-diagonal rotation)**, is implemented as **block Hadamard rotation on keys** (optional rotation on values) **before INT4 KV write**, inside a **fork of [SGLang](https://github.com/sgl-project/sglang)**—not a standalone runtime.
 
-**Block-diagonal rotation (BDR)** before 4-bit KV quantization is **not** a separate inference engine. It is implemented inside our **SGLang fork** as a **block Hadamard** transform on keys (and optionally values), combined with INT4 KV cache kernels and matching decode-side transforms so attention remains correct. See [docs/02-bdr-inference.md](docs/02-bdr-inference.md) and [third_party/sglang-fast-rotation/EVAL_NOTES.md](third_party/sglang-fast-rotation/EVAL_NOTES.md).
+We ship two submodule branches on the same fork remote:
 
-## Quick start: run BDR with rotation on **K** only
+- **[third_party/sglang-fast-rotation](third_party/sglang-fast-rotation)** — fused INT4 + BDR kernels; use for **throughput / latency** (`bench_serving`).
+- **[third_party/sglang-kmeans](third_party/sglang-kmeans)** — full **accuracy** matrix (BF16, INT4, BDR, k-means, k-means + rotation), KV dump, and centroid loading.
 
-From [third_party/sglang-fast-rotation/python](third_party/sglang-fast-rotation/python), after `pip install -e ".[all]"` and `pip install fast_hadamard_transform`:
+Pinned commits: [SUBMODULE_VERSIONS.md](SUBMODULE_VERSIONS.md).
+
+## Preparation
+
+```bash
+git clone --recurse-submodules https://github.com/togethercomputer/System-Aware-4-Bit-KV-Cache-Quantization.git
+cd System-Aware-4-Bit-KV-Cache-Quantization
+```
+
+If nested `tore-eval` fails under `sglang-fast-rotation` (private submodule), you can still reproduce accuracy with **simple-evals**; see [SUBMODULE_VERSIONS.md](SUBMODULE_VERSIONS.md).
+
+Full install (CUDA, PyTorch, `fast_hadamard_transform`, `flash-kmeans`, simple-evals): [docs/01-preparation.md](docs/01-preparation.md). Overview of docs: [docs/00-overview.md](docs/00-overview.md).
+
+## Run BDR
+
+Default setting: **rotate K only** (`ROTATE_V=0`). From [third_party/sglang-fast-rotation/python](third_party/sglang-fast-rotation/python) after `pip install -e ".[all]"` and `pip install fast_hadamard_transform`:
 
 ```bash
 export HADAMARD=1
@@ -32,25 +50,40 @@ python -m sglang.launch_server \
   --kv-cache-dtype int4
 ```
 
-- **BF16 KV:** `HADAMARD=0`, `--kv-cache-dtype auto`.  
-- **INT4 without rotation:** `HADAMARD=0`, `--kv-cache-dtype int4`.  
-- **Rotate V as well:** set `ROTATE_V=1` (ablation / alternate setting).
+| Setting | `HADAMARD` | `ROTATE_V` | `--kv-cache-dtype` |
+|---------|------------|------------|--------------------|
+| BF16 KV | `0` | `0` | `auto` |
+| INT4 KV (no rotation) | `0` | `0` | `int4` |
+| BDR + INT4 (K only) | `1` | `0` | `int4` |
+| BDR + INT4 (K+V) | `1` | `1` | `int4` |
 
-## Accuracy evaluation (OpenAI simple-evals)
+More detail: [docs/02-bdr-inference.md](docs/02-bdr-inference.md), [third_party/sglang-fast-rotation/EVAL_NOTES.md](third_party/sglang-fast-rotation/EVAL_NOTES.md).
 
-We report accuracy using **[OpenAI simple-evals](https://github.com/openai/simple-evals)** against SGLang’s **OpenAI-compatible HTTP API**. Build the **sglang-kmeans** submodule, launch `sglang.launch_server`, set `OPENAI_BASE_URL` to `http://<host>:<port>/v1`, then run simple-evals. Full matrix (BF16, INT4, BDR, k-means, k-means + rotation): [docs/03-evaluation-matrix.md](docs/03-evaluation-matrix.md).
+## Speed evaluation
 
-Helper: [scripts/run_eval_matrix.sh](scripts/run_eval_matrix.sh).
+Throughput and latency use **sglang-fast-rotation** and SGLang’s **`bench_serving`** (see [docs/05-throughput-benchmarking.md](docs/05-throughput-benchmarking.md) and upstream [Benchmark and Profiling](https://github.com/sgl-project/sglang/blob/main/docs/developer_guide/benchmark_and_profiling.md)).
 
-## Throughput evaluation (SGLang benchmarks)
+**Commands, sweep checklist, and raw log layout:** [eval_speed/](eval_speed/)  
+**Helper:** [scripts/run_bench_serving_example.sh](scripts/run_bench_serving_example.sh)
 
-Speed uses the **fast-rotation** fork and SGLang’s official tools, primarily **`python -m sglang.bench_serving`**. See [docs/05-throughput-benchmarking.md](docs/05-throughput-benchmarking.md) and the upstream guide: [Benchmark and Profiling](https://github.com/sgl-project/sglang/blob/main/docs/developer_guide/benchmark_and_profiling.md).
+### Speed results (summary)
 
-Helper: [scripts/run_bench_serving_example.sh](scripts/run_bench_serving_example.sh).
+| Model | KV config | Output tok/s | TTFT (ms) | TPOT (ms) | Workload |
+|-------|-----------|--------------|-----------|-----------|----------|
+| — | BF16 / auto | — | — | — | — |
+| — | INT4 | — | — | — | — |
+| — | INT4 + BDR (K-only) | — | — | — | — |
 
-## Representative results (paper)
+Fill from paper or from logs under [eval_speed/results/](eval_speed/results/).
 
-Fill this table from the camera-ready paper (models and benchmarks must match the paper text). Until release, you can point readers to the PDF tables.
+## Accuracy evaluation
+
+Accuracy uses **[OpenAI simple-evals](https://github.com/openai/simple-evals)** against the OpenAI-compatible HTTP API from **sglang-kmeans**. Method matrix (env + `--kv-cache-dtype`): [docs/03-evaluation-matrix.md](docs/03-evaluation-matrix.md). KV dump → centroids: [docs/04-kv-calibration.md](docs/04-kv-calibration.md).
+
+**Commands, method checklist, and result logs:** [eval_accuracy/](eval_accuracy/)  
+**Helper:** [scripts/run_eval_matrix.sh](scripts/run_eval_matrix.sh)
+
+### Accuracy results (summary)
 
 | Model | Method | Benchmark | Score |
 |-------|--------|-----------|-------|
@@ -60,22 +93,27 @@ Fill this table from the camera-ready paper (models and benchmarks must match th
 | — | K-means + INT4 | — | — |
 | — | K-means + BDR | — | — |
 
-## Full evaluation reproduction
+Fill from paper or from logs under [eval_accuracy/results/](eval_accuracy/results/).
 
-Large raw logs, exact simple-evals command lines, and frozen conda environments may live in a **separate artifact** (for example Hugging Face dataset, Zenodo archive, or an internal lab URL). **Add the canonical link here when it is published:**
+## Repository layout
+
+| Path | Role |
+|------|------|
+| [docs/](docs/) | Detailed setup, BDR, accuracy matrix, calibration, throughput |
+| [third_party/sglang-fast-rotation/](third_party/sglang-fast-rotation/) | Speed / production-style BDR + INT4 |
+| [third_party/sglang-kmeans/](third_party/sglang-kmeans/) | Accuracy matrix, KV dump, k-means |
+| [scripts/](scripts/) | Submodule init, eval env printer, bench template |
+| [tools/](tools/) | `fit_kv_centroids.py` for calibration |
+| [eval_speed/](eval_speed/) | Throughput experiment hub + [eval_speed/results/](eval_speed/results/) |
+| [eval_accuracy/](eval_accuracy/) | Accuracy experiment hub + [eval_accuracy/results/](eval_accuracy/results/) |
+
+## Full reproduction
+
+Large raw bundles (logs, conda lockfiles, exact simple-evals invocations) may live outside this repo.
 
 - **Full reproduction bundle:** *TBD — add URL*
 
-Submodule SHAs to match the paper: [SUBMODULE_VERSIONS.md](SUBMODULE_VERSIONS.md).
-
-## Clone
-
-```bash
-git clone --recurse-submodules https://github.com/togethercomputer/System-Aware-4-Bit-KV-Cache-Quantization.git
-cd System-Aware-4-Bit-KV-Cache-Quantization
-```
-
-If `tore-eval` fails to initialize under `sglang-fast-rotation` (private submodule), you can still follow this README using **simple-evals** only; see [SUBMODULE_VERSIONS.md](SUBMODULE_VERSIONS.md).
+Submodule SHAs for paper alignment: [SUBMODULE_VERSIONS.md](SUBMODULE_VERSIONS.md).
 
 ## License
 
