@@ -1,6 +1,6 @@
 # System-Aware 4-Bit KV Cache Quantization
 
-Official companion code for the paper **System-Aware 4-Bit KV-Cache Quantization for Real-World LLM Serving** (Together).
+Official companion code for the paper **System-Aware 4-Bit KV-Cache Quantization for Real-World LLM Serving** .
 
 ## Contents
 
@@ -46,8 +46,8 @@ This section covers everything needed to run BDR on **`third_party/sglang-fast-r
 ### Get the code
 
 ```bash
-git clone --recurse-submodules https://github.com/togethercomputer/Sys-aware-kv-int4.git
-cd Sys-aware-kv-int4
+git clone --recurse-submodules https://github.com/togethercomputer/Sys-Aware-KV-INT4.git
+cd Sys-Aware-KV-INT4
 ```
 
 If you cloned without submodules: `git submodule update --init third_party/sglang-fast-rotation`. Only `sglang-fast-rotation` is initialized by default; `sglang-kmeans` and `simple-evals` are opt-in (see [Install sglang-kmeans](#install-sglang-kmeans) and [Prepare](#prepare)).
