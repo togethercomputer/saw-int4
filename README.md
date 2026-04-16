@@ -1,6 +1,6 @@
 # System-Aware 4-Bit KV Cache Quantization
 
-Official companion code for the paper **System-Aware 4-Bit KV Cache Quantization** (Together). *Venue / arXiv / DOI: add at publication time.*
+Official companion code for the paper **System-Aware 4-Bit KV-Cache Quantization for Real-World LLM Serving** (Together).
 
 ## Contents
 
@@ -14,21 +14,27 @@ Official companion code for the paper **System-Aware 4-Bit KV Cache Quantization
 - [Primary accuracy and throughput](#primary-accuracy-and-throughput)
   - [Accuracy (primary)](#accuracy-primary)
     - [Prepare](#prepare)
+    - [RUN-GPQA](#run-gpqa)
+    - [Accuracy results (primary)](#accuracy-results-primary)
   - [Throughput and latency (primary)](#throughput-and-latency-primary)
     - [Prepare (genai-bench)](#prepare-genai-bench)
+    - [Speed results (primary)](#speed-results-primary)
 - [Ablation study (k-means, k-means + rotation)](#ablation-study-k-means-k-means--rotation)
   - [Install sglang-kmeans](#install-sglang-kmeans)
+  - [KV calibration (ablation only)](#kv-calibration-ablation-only)
+  - [Ablation method matrix](#ablation-method-matrix)
+    - [Accuracy results (ablation)](#accuracy-results-ablation)
 - [Repository layout](#repository-layout)
 - [Full reproduction](#full-reproduction)
 - [License](#license)
 
 ## Introduction
 
-This work studies **4-bit KV cache quantization** with a **system-aware** recipe. Our primary method, **BDR (block-diagonal rotation)**, is **block Hadamard rotation on keys** (optional rotation on values) **before INT4 KV write**, implemented inside a **fork of [SGLang](https://github.com/sgl-project/sglang)**.
+This work studies **4-bit KV-cache quantization** under **real serving constraints** such as paged memory layouts, regular memory access, and fused attention execution. Our primary method, **BDR (block-diagonal rotation)**, applies a **block-diagonal Hadamard rotation** to the KV cache before **token-wise INT4 KV-cache quantization**, implemented directly inside a **fork of [SGLang](https://github.com/sgl-project/sglang)**.
 
 We ship two submodule branches on the same fork remote:
 
-- **[third_party/sglang-fast-rotation](third_party/sglang-fast-rotation)** — **Our proposed BDR:** fused INT4 + Rotation. Use this fork for **both accuracy and throughput** on **BF16**, **INT4**, and **BDR** (the main paper numbers).
+- **[third_party/sglang-fast-rotation](third_party/sglang-fast-rotation)** — **Our proposed BDR implementation:** fused block-diagonal rotation + INT4 KV-cache write. Use this fork for **both accuracy and throughput** on **BF16**, **INT4**, and **BDR** (the main paper numbers).
 - **[third_party/sglang-kmeans](third_party/sglang-kmeans)** — **Ablation study for kmeans, kmeans+rotation:** KV dump, k-means centroids, and k-means + rotation variants. Not required to reproduce the core BDR vs BF16 vs INT4 story.
 
 Pinned commits: [SUBMODULE_VERSIONS.md](SUBMODULE_VERSIONS.md).
@@ -40,8 +46,8 @@ This section covers everything needed to run BDR on **`third_party/sglang-fast-r
 ### Get the code
 
 ```bash
-git clone --recurse-submodules https://github.com/togethercomputer/System-Aware-4-Bit-KV-Cache-Quantization.git
-cd System-Aware-4-Bit-KV-Cache-Quantization
+git clone --recurse-submodules https://github.com/togethercomputer/Sys-aware-kv-int4.git
+cd Sys-aware-kv-int4
 ```
 
 If you cloned without submodules: `git submodule update --init third_party/sglang-fast-rotation`. Only `sglang-fast-rotation` is initialized by default; `sglang-kmeans` and `simple-evals` are opt-in (see [Install sglang-kmeans](#install-sglang-kmeans) and [Prepare](#prepare)).
@@ -138,20 +144,38 @@ python scripts/bdr_smoke_test.py --port 30001 --model Qwen/Qwen3-4B-Thinking-250
 
 #### Prepare
 
-**Prerequisite (GPQA client):** **[openai/simple-evals](https://github.com/openai/simple-evals)** is included as a submodule at **`third_party/simple-evals`**. It is not initialized by default (not needed for BDR server runs), so init and install it explicitly:
+**Prerequisite (GPQA client):** **[openai/simple-evals](https://github.com/openai/simple-evals)** is included as a submodule at **`third_party/simple-evals`**. It is not initialized by default (not needed for BDR server runs), so init it explicitly and install the runtime dependencies:
 
 ```bash
-git submodule update --init third_party/simple-evals
+git submodule update --init --checkout third_party/simple-evals
 cd third_party/simple-evals
-pip install -e .
-pip install openai tqdm numpy
+mkdir -p simple_evals
+touch simple_evals/__init__.py
+pip install openai pandas requests jinja2 tqdm numpy
 ```
 
-How to run evals (models, **`--eval gpqa`**, **`OPENAI_BASE_URL`**, registering a sampler for your SGLang `--model-path`, etc.) follows upstream [simple-evals README](https://github.com/openai/simple-evals/blob/main/README.md#running-the-evals).
+This vendored checkout is run directly from source rather than installed as a package. How to run evals (models, **`--eval gpqa`**, **`OPENAI_BASE_URL`**, registering a sampler for your SGLang `--model-path`, etc.) otherwise follows upstream [simple-evals README](https://github.com/openai/simple-evals/blob/main/README.md#running-the-evals).
 
-With **simple-evals** installed and the SGLang server up (start it in the desired mode from [Run BDR](#run-bdr), using **`Qwen/Qwen3-4B-Thinking-2507`** as the model), point the client at **`http://127.0.0.1:<port>/v1`** and run GPQA. **[scripts/run_primary_eval_matrix.sh](scripts/run_primary_eval_matrix.sh)** (`bf16`, `int4`, `bdr`, `bdr_kv`) prints the server launch command and sets **`SIMPLE_EVALS_DIR`** to **`third_party/simple-evals`** by default.
+Add a local model alias once in `third_party/simple-evals/simple_evals.py` inside the `models = { ... }` dictionary so `simple-evals` knows how to call your running SGLang server. For the BDR server below, add:
 
-**Hub for logs / summary tables:** [eval_primary/](eval_primary/)
+```python
+"qwen3_4b": ChatCompletionSampler(
+    model="Qwen/Qwen3-4B-Thinking-2507",
+    system_message=OPENAI_SYSTEM_MESSAGE_API,
+    max_tokens=32768,
+),
+```
+
+#### RUN-GPQA
+With **simple-evals** installed and the SGLang server already up (start it in the desired mode from [Run BDR](#run-bdr), using **`Qwen/Qwen3-4B-Thinking-2507`** as the model), point the client at **`http://127.0.0.1:<port>/v1`** and run GPQA:
+
+```bash
+cd third_party/simple-evals
+export OPENAI_BASE_URL="http://127.0.0.1:30000/v1" 
+export OPENAI_API_KEY="dummy"
+python -m simple-evals.simple_evals --model qwen3_4b --eval gpqa --n-repeats 3
+```
+
 
 #### Accuracy results (primary)
 
@@ -159,9 +183,8 @@ With **simple-evals** installed and the SGLang server up (start it in the desire
 |-------|--------|-----------|-------|
 | Qwen/Qwen3-4B-Thinking-2507 | BF16 | GPQA | |
 | Qwen/Qwen3-4B-Thinking-2507 | INT4 | GPQA | |
-| Qwen/Qwen3-4B-Thinking-2507 | BDR (K-only) | GPQA | |
+| Qwen/Qwen3-4B-Thinking-2507 | BDR (K-only) | GPQA | 65.8249 |
 
-Fill from the paper or from [eval_primary/results/](eval_primary/results/).
 
 ### Throughput and latency (primary)
 

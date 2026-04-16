@@ -1,106 +1,81 @@
 #!/usr/bin/env bash
-# Primary evaluation: BF16 / INT4 / BDR — server from sglang-fast-rotation only.
-# Client: open-source simple-evals https://github.com/openai/simple-evals
+# Run GPQA with openai/simple-evals against an already-running SGLang server.
 #
 # Usage:
-#   ./scripts/run_primary_eval_matrix.sh <METHOD>
-# Methods: bf16 | int4 | bdr | bdr_kv
+#   SIMPLE_EVALS_MODEL=<registered_simple_evals_model> ./scripts/run_primary_eval_matrix.sh
 #
-# Optional env: MODEL_PATH (default Qwen/Qwen3-4B-Thinking-2507 for accuracy), PORT,
-#   SIMPLE_EVALS_DIR, PREFILL_ATTENTION_BACKEND (default fa3), DECODE_ATTENTION_BACKEND (default triton)
+# Optional env:
+#   SIMPLE_EVALS_DIR  (default: <repo>/third_party/simple-evals)
+#   SIMPLE_EVALS_MODEL  required; model key registered in simple-evals
+#   OPENAI_BASE_URL  (default: http://127.0.0.1:30000/v1)
+#   OPENAI_API_KEY   (default: dummy)
+#   GPQA_EXAMPLES    optional --examples value for debugging
+#   GPQA_N_REPEATS   optional --n-repeats override
+#   GPQA_DEBUG       set to 1 to pass --debug
+#   PYTHON_BIN       (default: python)
+#
+# Any extra CLI args are forwarded to simple-evals.
 
 set -euo pipefail
-METHOD="${1:-}"
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-FR="$ROOT/third_party/sglang-fast-rotation/python"
-MODEL_PATH="${MODEL_PATH:-Qwen/Qwen3-4B-Thinking-2507}"
-PORT="${PORT:-30000}"
-PREFILL_ATTENTION_BACKEND="${PREFILL_ATTENTION_BACKEND:-fa3}"
-DECODE_ATTENTION_BACKEND="${DECODE_ATTENTION_BACKEND:-triton}"
 
-if [[ -z "$METHOD" ]]; then
-  echo "Usage: $0 <bf16|int4|bdr|bdr_kv>" >&2
-  echo "For k-means ablations use: ./scripts/run_eval_matrix.sh kmeans|kmeans_bdr" >&2
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SE="${SIMPLE_EVALS_DIR:-$ROOT/third_party/simple-evals}"
+MODEL="${SIMPLE_EVALS_MODEL:-}"
+OPENAI_BASE_URL="${OPENAI_BASE_URL:-http://127.0.0.1:30000/v1}"
+OPENAI_API_KEY="${OPENAI_API_KEY:-dummy}"
+PYTHON_BIN="${PYTHON_BIN:-python}"
+
+if [[ -z "$MODEL" ]]; then
+  cat >&2 <<EOF
+Set SIMPLE_EVALS_MODEL to the model key you registered in simple-evals.
+
+Example:
+  SIMPLE_EVALS_MODEL=qwen3_4b_sglang ./scripts/run_primary_eval_matrix.sh
+EOF
+  exit 1
+fi
+
+if [[ ! -d "$SE" ]]; then
+  cat >&2 <<EOF
+simple-evals directory not found: $SE
+
+Initialize it first:
+  git submodule update --init --checkout third_party/simple-evals
+  cd third_party/simple-evals
+  pip install openai pandas requests jinja2 tqdm numpy
+EOF
   exit 1
 fi
 
 echo "Repo root: $ROOT"
-echo "SGLang (fast-rotation fork) python: $FR"
-echo "Model: $MODEL_PATH  Port: $PORT"
+echo "simple-evals dir: $SE"
+echo "simple-evals model: $MODEL"
+echo "OpenAI-compatible endpoint: $OPENAI_BASE_URL"
 echo ""
 
-case "$METHOD" in
-  bf16)
-    cat <<EOF
-unset HADAMARD ROTATE_V HADAMARD_ORDER SGLANG_KV_CENTROIDS_PATH N_CLUSTERS || true
-export HADAMARD=0
-export ROTATE_V=0
-cd "$FR"
-python -m sglang.launch_server \
-  --prefill-attention-backend "$PREFILL_ATTENTION_BACKEND" \
-  --decode-attention-backend "$DECODE_ATTENTION_BACKEND" \
-  --model-path "$MODEL_PATH" --port "$PORT" --kv-cache-dtype auto
-EOF
-    ;;
-  int4)
-    cat <<EOF
-export HADAMARD=0
-export ROTATE_V=0
-unset SGLANG_KV_CENTROIDS_PATH || true
-cd "$FR"
-python -m sglang.launch_server \
-  --prefill-attention-backend "$PREFILL_ATTENTION_BACKEND" \
-  --decode-attention-backend "$DECODE_ATTENTION_BACKEND" \
-  --model-path "$MODEL_PATH" --port "$PORT" --kv-cache-dtype int4
-EOF
-    ;;
-  bdr)
-    cat <<EOF
-export HADAMARD=1
-export ROTATE_V=0
-export HADAMARD_ORDER="${HADAMARD_ORDER:-16}"
-unset SGLANG_KV_CENTROIDS_PATH || true
-cd "$FR"
-python -m sglang.launch_server \
-  --prefill-attention-backend "$PREFILL_ATTENTION_BACKEND" \
-  --decode-attention-backend "$DECODE_ATTENTION_BACKEND" \
-  --model-path "$MODEL_PATH" --port "$PORT" --kv-cache-dtype int4
-EOF
-    ;;
-  bdr_kv)
-    cat <<EOF
-export HADAMARD=1
-export ROTATE_V=1
-export HADAMARD_ORDER="${HADAMARD_ORDER:-16}"
-unset SGLANG_KV_CENTROIDS_PATH || true
-cd "$FR"
-python -m sglang.launch_server \
-  --prefill-attention-backend "$PREFILL_ATTENTION_BACKEND" \
-  --decode-attention-backend "$DECODE_ATTENTION_BACKEND" \
-  --model-path "$MODEL_PATH" --port "$PORT" --kv-cache-dtype int4
-EOF
-    ;;
-  *)
-    echo "Unknown method: $METHOD (expected bf16|int4|bdr|bdr_kv)" >&2
-    exit 1
-    ;;
-esac
+export OPENAI_BASE_URL
+export OPENAI_API_KEY
 
-echo ""
-SE="${SIMPLE_EVALS_DIR:-}"
-if [[ -n "$SE" ]]; then
-  SE_CMD="cd $(printf '%q' "$SE")"
-else
-  SE_CMD='cd /path/to/simple-evals   # git clone https://github.com/openai/simple-evals.git && pip install -e .'
+CMD=(
+  "$PYTHON_BIN" simple_evals.py
+  --model "$MODEL"
+  --eval gpqa
+)
+
+if [[ -n "${GPQA_EXAMPLES:-}" ]]; then
+  CMD+=(--examples "$GPQA_EXAMPLES")
 fi
-cat <<EOF
---- Client (open-source simple-evals, separate terminal) ---
-# Client prep: README.md#prepare  GPQA: README.md#accuracy-primary and upstream
-# https://github.com/openai/simple-evals/blob/main/README.md#running-the-evals
-export OPENAI_BASE_URL="http://127.0.0.1:${PORT}/v1"
-export OPENAI_API_KEY="dummy"
-${SE_CMD}
-EOF
-if [[ -z "$SE" ]]; then
-  echo "# Tip: export SIMPLE_EVALS_DIR=/abs/path/to/simple-evals before $0 to emit a concrete cd." >&2
+
+if [[ -n "${GPQA_N_REPEATS:-}" ]]; then
+  CMD+=(--n-repeats "$GPQA_N_REPEATS")
 fi
+
+if [[ "${GPQA_DEBUG:-0}" == "1" ]]; then
+  CMD+=(--debug)
+fi
+
+CMD+=("$@")
+
+cd "$SE"
+echo "Running: ${CMD[*]}"
+"${CMD[@]}"

@@ -13,15 +13,25 @@ import argparse
 from openai import OpenAI
 
 # Sample question from GPQA (graduate-level, Google-proof Q&A benchmark).
+# Expected answer: A.
 GPQA_SAMPLE = """\
-trans-Cinnamaldehyde was treated with methylmagnesium bromide, forming product 1.
+Answer the following multiple choice question.
 
-Product 1 was treated with pyridinium chlorochromate, forming product 2.
+Think step by step before answering.
 
-Product 2 was treated with (dimethyl(oxo)-λ6-sulfaneylidene)methane in DMSO \
-at elevated temperature, forming product 3.
+The last line of your response should be exactly:
+Answer: $LETTER
 
-How many carbon atoms are there in product 3?
+Where LETTER is one of A, B, C, or D.
+
+You overhear two chemists talking to each other as they leave a synthetic organic chemistry lab. One asks the other, "So, how did it go?" The second chemist replies, "Not well - my compounds are on top of each other."
+
+What is the second chemist most likely referring to?
+
+A) The compounds they are working with have similar polarities.
+B) The compounds they are working with are bonding to each other through non-covalent/van der Waals interactions.
+C) The compounds they are working with have similar boiling points.
+D) The compounds they are working with have similar optical rotations.
 """
 
 
@@ -46,7 +56,7 @@ def main():
         messages=[{"role": "user", "content": GPQA_SAMPLE}],
         temperature=0.6,
         top_p=0.95,
-        max_tokens=512,
+        max_tokens=32768,
         stream=True,
     )
 

@@ -15,7 +15,7 @@ Build **[third_party/sglang-kmeans](../third_party/sglang-kmeans)**. Use **MHA**
 
 ## Client
 
-**simple-evals** is available at **`third_party/simple-evals`** — run `git submodule update --init third_party/simple-evals` from the repo root if not yet initialized, then install per the main README ([Prepare](../README.md#prepare)); run GPQA against the k-means server the same way as primary accuracy ([Accuracy (primary)](../README.md#accuracy-primary)). Set `MODEL_PATH` to match the server you calibrate and evaluate.
+**simple-evals** is available at **`third_party/simple-evals`** — run `git submodule update --init --checkout third_party/simple-evals` from the repo root if not yet initialized, then install per the main README ([Prepare](../README.md#prepare)); run GPQA against the k-means server the same way as primary accuracy ([Accuracy (primary)](../README.md#accuracy-primary)). Set `MODEL_PATH` to match the server you calibrate and evaluate.
 
 From the **repository root**:
 

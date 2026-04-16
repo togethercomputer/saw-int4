@@ -85,7 +85,7 @@ SE="${SIMPLE_EVALS_DIR:-}"
 if [[ -n "$SE" ]]; then
   SE_CMD="cd $(printf '%q' "$SE")"
 else
-  SE_CMD='cd /path/to/simple-evals   # git clone https://github.com/openai/simple-evals.git && pip install -e .'
+  SE_CMD='cd /path/to/simple-evals   # install deps: pip install openai pandas requests jinja2 tqdm numpy'
 fi
 cat <<EOF
 --- Client (open-source simple-evals, separate terminal) ---
