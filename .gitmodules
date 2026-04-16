@@ -1,7 +1,7 @@
 [submodule "third_party/sglang-fast-rotation"]
 	path = third_party/sglang-fast-rotation
 	url = https://github.com/jindajia/sglang-fork.git
-	branch = jinda_rotation_fast
+	branch = colm_rotation_fast
 [submodule "third_party/sglang-kmeans"]
 	path = third_party/sglang-kmeans
 	url = https://github.com/jindajia/sglang-fork.git
