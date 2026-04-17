@@ -1,6 +1,9 @@
-# System-Aware 4-Bit KV Cache Quantization
+# saw-int4
 
-Official companion code for the paper **System-Aware 4-Bit KV-Cache Quantization for Real-World LLM Serving**.
+saw-int4 is the official implementation of  
+**<<SAW-INT4: System-Aware 4-Bit KV-Cache Quantization for Real-World LLM Serving>>**
+
+This repository implements Block Diagonal Rotation (BDR) for KV-cache quantization, along with system-level optimizations that seamlessly integrate into SGLang. The resulting system achieves near-BF16 accuracy while preserving the end-to-end performance benefits of INT4.
 
 ## Contents
 
@@ -46,8 +49,8 @@ This section covers everything needed to run BDR on **`third_party/sglang-fast-r
 ### Get the code
 
 ```bash
-git clone --recurse-submodules https://github.com/togethercomputer/Sys-Aware-KV-INT4.git
-cd Sys-Aware-KV-INT4
+git clone --recurse-submodules https://github.com/togethercomputer/saw-int4.git
+cd saw-int4
 ```
 
 If you cloned without submodules: `git submodule update --init third_party/sglang-fast-rotation`.
@@ -173,7 +176,7 @@ python -m simple-evals.simple_evals --model qwen3_4b --eval gpqa --n-repeats 3
 
 | Model | Method | Benchmark | Score |
 |-------|--------|-----------|-------|
-| Qwen/Qwen3-4B-Thinking-2507 | BF16 | GPQA | |
+| Qwen/Qwen3-4B-Thinking-2507 | BF16 | GPQA | 66.6667 |
 | Qwen/Qwen3-4B-Thinking-2507 | INT4 | GPQA | 0 |
 | Qwen/Qwen3-4B-Thinking-2507 | BDR (K-only) | GPQA | 65.8249 |
 
