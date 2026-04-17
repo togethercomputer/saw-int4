@@ -36,14 +36,16 @@ trap cleanup INT TERM
 # =============================================================================
 
 # genai-bench traffic scenarios: D(input_tokens, output_tokens)
-IFS=' ' read -r -a TRAFFIC_SCENARIOS <<< "${TRAFFIC_SCENARIOS_OVERRIDE:-D(256,1024)}"
+IFS=' ' read -r -a TRAFFIC_SCENARIOS <<< "${TRAFFIC_SCENARIOS_OVERRIDE:-D(8192,1024)}"
 
-# Concurrency levels to sweep (passed together in one genai-bench run)
-IFS=' ' read -r -a CONCURRENCIES <<< "${CONCURRENCIES_OVERRIDE:-32 64 128 256}"
+# Concurrency levels to sweep (one genai-bench run per concurrency)
+IFS=' ' read -r -a CONCURRENCIES <<< "${CONCURRENCIES_OVERRIDE:-1 8 16 32 256}"
+
+# Per-concurrency max requests (must align 1:1 with CONCURRENCIES above)
+IFS=' ' read -r -a MAX_REQUESTS_PER_CONC <<< "${MAX_REQUESTS_PER_CONC_OVERRIDE:-16 16 16 32 256}"
 
 # genai-bench run limits
 MAX_TIME_PER_RUN="${MAX_TIME_PER_RUN:-20}"      # minutes
-MAX_REQUESTS_PER_RUN="${MAX_REQUESTS_PER_RUN:-256}"
 
 # GPU to consider "free" (MB used below this threshold)
 GPU_FREE_MEM_MB="${GPU_FREE_MEM_MB:-500}"
@@ -63,9 +65,9 @@ GPU_POLL_INTERVAL="${GPU_POLL_INTERVAL:-60}"
 #   tp_size       : tensor-parallel size
 # =============================================================================
 MODEL_CONFIGS=(
-    "BASE|0|0|0  |BF16|Qwen/Qwen3-8B|2|1"
-    "BASE|0|0|0  |INT4|Qwen/Qwen3-8B|3|1"
-    "BDR |1|0|128|INT4|Qwen/Qwen3-8B|4|1"
+    "BASE|0|0|0  |BF16|Qwen/Qwen3-8B|6,7|2"
+    "BASE|0|0|0  |INT4|Qwen/Qwen3-8B|2,3|2"
+    "BDR |1|0|128|INT4|Qwen/Qwen3-8B|4,5|2"
 )
 
 # =============================================================================
@@ -212,6 +214,7 @@ benchmark_single_config() {
         log "    --prefill-attention-backend fa3 \\"
         log "    --decode-attention-backend triton \\"
         log "    --tensor-parallel-size $tp_size \\"
+        log "    --mem-fraction-static 0.8 \\"
         log "    --host 0.0.0.0 \\"
         log "    --port $server_port \\"
         log "    --trust-remote-code"
@@ -227,6 +230,7 @@ benchmark_single_config() {
             --prefill-attention-backend fa3 \
             --decode-attention-backend triton \
             --tensor-parallel-size "$tp_size" \
+            --mem-fraction-static 0.8 \
             --host 0.0.0.0 \
             --port "$server_port" \
             --trust-remote-code \
@@ -267,42 +271,43 @@ benchmark_single_config() {
     log "✓ Warmup done" | tee -a "$batch_log"
 
     # ------------------------------------------------------------------
-    # Benchmark sweep — build multi-value args
+    # Benchmark sweep — one genai-bench run per concurrency level so each
+    # can have its own --max-requests-per-run limit
     # ------------------------------------------------------------------
     local scenario_args=()
     for sc in "${TRAFFIC_SCENARIOS[@]}"; do
         scenario_args+=(--traffic-scenario "$sc")
     done
 
-    local concurrency_args=()
-    for c in "${CONCURRENCIES[@]}"; do
-        concurrency_args+=(--num-concurrency "$c")
+    log "Running benchmark (${#CONCURRENCIES[@]} concurrency levels)..." | tee -a "$batch_log"
+    local exit_code=0
+    for ci in "${!CONCURRENCIES[@]}"; do
+        local conc="${CONCURRENCIES[$ci]}"
+        local max_req="${MAX_REQUESTS_PER_CONC[$ci]}"
+        log "  conc=$conc  max_requests=$max_req" | tee -a "$batch_log"
+        "$GENAI_BENCH" benchmark \
+                --api-backend sglang \
+                --api-base "http://127.0.0.1:${server_port}" \
+                --api-key dummy \
+                --api-model-name "$model_name" \
+                --model-tokenizer "$model_name" \
+                --task text-to-text \
+                "${scenario_args[@]}" \
+                --num-concurrency "$conc" \
+                --max-time-per-run "$MAX_TIME_PER_RUN" \
+                --max-requests-per-run "$max_req" \
+                --server-engine SGLang \
+                --server-gpu-type H100 \
+                --server-version custom \
+                --server-gpu-count "$tp_size" \
+                --experiment-base-dir "$result_dir" \
+                --experiment-folder-name "${model_short}_${label}_conc${conc}" \
+                --master-port "$client_master_port" \
+            2>&1 | tee -a "$batch_log" || { exit_code=$?; log "✗ conc=$conc failed (exit $exit_code)" | tee -a "$batch_log"; }
     done
 
-    log "Running benchmark..." | tee -a "$batch_log"
-    local exit_code=0
-    "$GENAI_BENCH" benchmark \
-            --api-backend sglang \
-            --api-base "http://127.0.0.1:${server_port}" \
-            --api-key dummy \
-            --api-model-name "$model_name" \
-            --model-tokenizer "$model_name" \
-            --task text-to-text \
-            "${scenario_args[@]}" \
-            "${concurrency_args[@]}" \
-            --max-time-per-run "$MAX_TIME_PER_RUN" \
-            --max-requests-per-run "$MAX_REQUESTS_PER_RUN" \
-            --server-engine SGLang \
-            --server-gpu-type H100 \
-            --server-version custom \
-            --server-gpu-count "$tp_size" \
-            --experiment-base-dir "$result_dir" \
-            --experiment-folder-name "${model_short}_${label}" \
-            --master-port "$client_master_port" \
-        2>&1 | tee -a "$batch_log" || exit_code=$?
-
     if [ $exit_code -ne 0 ]; then
-        log "✗ Benchmark failed (exit $exit_code)" | tee -a "$batch_log"
+        log "✗ Benchmark had failures (last exit $exit_code)" | tee -a "$batch_log"
     else
         log "✓ Benchmark complete — results in $result_dir" | tee -a "$batch_log"
     fi
@@ -340,7 +345,7 @@ log "=========================================="
 log "Throughput sweep — $N config(s)"
 log "Scenarios:    ${TRAFFIC_SCENARIOS[*]}"
 log "Concurrencies: ${CONCURRENCIES[*]}"
-log "Max time/run: ${MAX_TIME_PER_RUN} min  Max requests: ${MAX_REQUESTS_PER_RUN}"
+log "Max time/run: ${MAX_TIME_PER_RUN} min  Max requests/conc: ${MAX_REQUESTS_PER_CONC[*]}"
 log "Results:      $RESULTS_BASE"
 log "Logs:         $LOGS_BASE"
 log "=========================================="

@@ -243,51 +243,34 @@ SGLang’s built-in `bench_serving` ([bench_serving](https://github.com/sgl-proj
 
 #### Speed results (primary)
 
-Hardware: 1× H100 80 GB, TP=1. Model: `Qwen/Qwen3-8B`.  
-Client: [genai-bench](https://github.com/sgl-project/genai-bench). Metric definitions: [eval_speed/metrics.md](eval_speed/metrics.md).
+Hardware: 2× H100 80 GB, TP=2. Model: `Qwen/Qwen3-8B`.  
+Client: [genai-bench](https://github.com/sgl-project/genai-bench). Metric definitions: [eval_speed/metrics.md](eval_speed/metrics.md).  
+Raw data: [eval_speed/results_summary_tp2_medium.csv](eval_speed/results_summary_tp2_medium.csv).
 
-**Short context — `D(256, 1024)` (256 input / 1024 output tokens)**  
-Cap: 5 min or 256 requests. Results: [eval_speed/results/20260416_203040/](eval_speed/results/20260416_203040/)
+**Medium context — `D(8192, 1024)` (8 192 input / 1024 output tokens)**  
+Cap: 20 min or 16–256 requests (varies by concurrency). Results: [eval_speed/results/20260417_144242/](eval_speed/results/20260417_144242/)
 
-| KV config | Conc | output_tps(job) | mean_input_tps(req) | mean_output_tps(req) | mean_ttft(req) (ms) | E2E mean(req) (s) | E2E p75(req) (s) | E2E p90(req) (s) | total requests | Wall (s) |
-|-----------|-----:|----------------:|--------------------:|---------------------:|--------------------:|------------------:|-----------------:|-----------------:|---------------:|---------:|
-| BF16      |  32 |  3,795 | 1,573 | 122.1 |    196 |  8.57 |  8.60 |  8.62 | 256 |  69 |
-| INT4      |  32 |  3,687 | 1,380 | 120.9 |    225 |  8.69 |  8.71 |  8.75 | 256 |  71 |
-| INT4 + BDR (K-only, ord=128) |  32 |  3,689 | 1,379 | 120.2 |    226 |  8.74 |  8.74 |  8.76 | 256 |  71 |
-| BF16      |  64 |  5,950 |   796 |  98.7 |    369 | 10.74 | 10.78 | 10.82 | 256 |  44 |
-| INT4      |  64 |  6,371 |   774 | 105.0 |    370 | 10.11 | 10.16 | 10.20 | 256 |  41 |
-| INT4 + BDR (K-only, ord=128) |  64 |  6,235 |   755 | 104.3 |    377 | 10.19 | 10.24 | 10.26 | 256 |  42 |
-| BF16      | 128 |  8,410 |   455 |  71.8 |    657 | 14.92 | 15.00 | 15.11 | 256 |  31 |
-| INT4      | 128 |  9,544 |   437 |  81.0 |    665 | 13.30 | 13.38 | 13.45 | 256 |  28 |
-| INT4 + BDR (K-only, ord=128) | 128 |  9,350 |   458 |  80.1 |    655 | 13.43 | 13.51 | 13.60 | 256 |  28 |
-| BF16      | 256 | 11,195 |   242 |  49.3 |  1,224 | 22.00 | 22.15 | 22.24 | 256 |  23 |
-| INT4      | 256 | 11,624 |   225 |  51.1 |  1,237 | 21.25 | 21.50 | 21.57 | 256 |  23 |
-| INT4 + BDR (K-only, ord=128) | 256 | 11,732 |   266 |  51.6 |  1,148 | 20.99 | 21.12 | 21.19 | 256 |  22 |
+| KV config | Conc | output_tps(job) | mean_output_tps(req) | mean_ttft(req) (ms) | E2E mean(req) (s) | E2E p75(req) (s) | E2E p90(req) (s) | total requests | Wall (s) |
+|-----------|-----:|----------------:|---------------------:|--------------------:|------------------:|-----------------:|-----------------:|---------------:|---------:|
+| BF16      |   1 |   123.1 | 127.02 |   154.4 |  8.21 |  8.22 |  8.23 |  16 | 133.1 |
+| INT4      |   1 |   143.6 | 149.14 |   168.6 |  7.03 |  7.02 |  7.04 |  16 | 114.1 |
+| INT4 + BDR (K-only, ord=128) |   1 |   141.2 | 147.69 |   221.7 |  7.15 |  7.09 |  7.10 |  16 | 116.1 |
+| BF16      |   8 |   815.7 | 118.29 |   785.3 |  9.44 |  9.54 |  9.60 |  16 |  20.1 |
+| INT4      |   8 |   904.4 | 134.42 |   895.2 |  8.52 |  8.62 |  8.67 |  16 |  18.1 |
+| INT4 + BDR (K-only, ord=128) |   8 |   897.6 | 132.83 | 1,038.7 |  8.75 |  8.92 |  9.01 |  16 |  18.3 |
+| BF16      |  16 | 1,219.8 | 103.32 | 1,537.2 | 11.49 | 11.67 | 11.84 |  16 |  13.4 |
+| INT4      |  16 | 1,424.6 | 114.91 | 1,521.1 | 10.47 | 10.63 | 10.72 |  16 |  11.5 |
+| INT4 + BDR (K-only, ord=128) |  16 | 1,363.6 | 112.65 | 1,619.5 | 10.74 | 10.90 | 10.99 |  16 |  12.0 |
+| BF16      |  32 | 1,552.5 |  64.46 | 3,017.9 | 18.98 | 19.31 | 19.56 |  32 |  21.1 |
+| INT4      |  32 | 1,787.7 |  77.06 | 2,900.2 | 16.29 | 16.61 | 16.80 |  32 |  18.3 |
+| INT4 + BDR (K-only, ord=128) |  32 | 1,786.3 |  76.82 | 2,888.6 | 16.32 | 16.64 | 16.83 |  32 |  18.3 |
+| BF16      | 256 | 2,068.8 |  31.65 | 47,224.5 | 80.26 | 116.58 | 118.62 | 263 | 130.2 |
+| INT4      | 256 | 2,296.3 |  14.05 | 22,392.8 | 97.93 | 100.79 | 102.49 | 257 | 114.6 |
+| INT4 + BDR (K-only, ord=128) | 256 | 2,273.7 |  13.90 | 22,746.9 | 98.94 | 101.86 | 103.57 | 257 | 115.7 |
 
-![Short context throughput: BF16 vs INT4 vs BDR](eval_speed/short_context_bf16_int4_bdr.png)
+![Medium context throughput: BF16 vs INT4 vs BDR (TP=2)](eval_speed/2gpu_tp2_medium_8192.png)
 
-**Long context — `D(16384, 1024)` (16 384 input / 1024 output tokens)**  
-Cap: 20 min or 64–256 requests (varies by concurrency). Results: [eval_speed/results/20260416_214449/](eval_speed/results/20260416_214449/) (conc 8–64), [eval_speed/results/20260416_233035/](eval_speed/results/20260416_233035/) (conc 128)
-
-| KV config | Conc | output_tps(job) | mean_input_tps(req) | mean_output_tps(req) | mean_ttft(req) (ms) | E2E mean(req) (s) | E2E p75(req) (s) | E2E p90(req) (s) | total requests | Wall (s) |
-|-----------|-----:|----------------:|--------------------:|---------------------:|--------------------:|------------------:|-----------------:|-----------------:|---------------:|---------:|
-| BF16      |   8 |   414 |  8,311 | 61.4 |  2,636 | 19.37 | 19.53 | 19.65 | 64 | 158 |
-| INT4      |   8 |   458 |  8,391 | 69.2 |  2,631 | 17.50 | 17.67 | 17.77 | 64 | 143 |
-| INT4 + BDR (K-only, ord=128) |   8 |   457 |  8,784 | 68.7 |  2,523 | 17.50 | 17.69 | 17.78 | 64 | 143 |
-| BF16      |  16 |   481 |  4,413 | 36.7 |  5,104 | 33.14 | 33.48 | 33.65 | 64 | 136 |
-| INT4      |  16 |   571 |  4,672 | 45.4 |  4,956 | 27.74 | 28.04 | 28.28 | 64 | 115 |
-| INT4 + BDR (K-only, ord=128) |  16 |   568 |  4,083 | 44.8 |  4,875 | 27.94 | 28.30 | 28.54 | 64 | 116 |
-| BF16      |  32 |   570 |  1,741 | 32.9 | 18,047 | 49.58 | 73.20 | 73.64 | 64 | 115 |
-| INT4      |  32 |   618 |  2,147 | 25.4 |  9,568 | 50.45 | 51.11 | 51.49 | 64 | 106 |
-| INT4 + BDR (K-only, ord=128) |  32 |   616 |  2,215 | 25.1 |  9,350 | 50.57 | 51.23 | 51.62 | 64 | 107 |
-| BF16      |  64 |   471 |    806 | 32.7 | 44,798 | 76.91 | 112.33 | 113.22 | 64 | 139 |
-| INT4      |  64 |   666 |  1,114 | 14.7 | 19,398 | 90.46 | 91.70 | 92.51 | 64 |  98 |
-| INT4 + BDR (K-only, ord=128) |  64 |   663 |  1,150 | 14.4 | 18,371 | 90.78 | 92.06 | 92.83 | 64 |  99 |
-| BF16      | 128 |   559 |    310 | 32.9 | 113,583 | 145.96 | 220.85 | 221.91 | 148 | 271 |
-| INT4      | 128 |   701 |    527 | 12.3 |  57,654 | 142.19 | 208.11 | 210.82 | 153 | 224 |
-| INT4 + BDR (K-only, ord=128) | 128 |   701 |    535 | 12.3 |  57,054 | 142.09 | 208.05 | 210.73 | 153 | 224 |
-
-![Long context throughput: BF16 vs INT4 vs BDR](eval_speed/long_context_bf16_int4_bdr.png)
+> **More results** (1× H100, TP=1, input 256 tokens and 16 k tokens): [eval_speed/tp1_results.md](eval_speed/tp1_results.md)
 
 ## Ablation study (k-means, k-means + rotation)
 
