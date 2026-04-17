@@ -170,7 +170,7 @@ python -m simple-evals.simple_evals --model qwen3_4b --eval gpqa --n-repeats 3
 ```
 
 
-#### Accuracy results (primary)
+#### Accuracy results (primary, temp=0.6, seq=32k and top=0.95)
 
 | Model | Method | Benchmark | Score |
 |-------|--------|-----------|-------|
